@@ -1,65 +1,93 @@
 # -*- coding: utf-8 -*-
-import os
+"""
+Utils module for Credit Risk Modeling inference and scoring.
+"""
+
+from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
 
-# Load model data safely with relative path resolving
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "model", "model_data.pkl")
+# Resolve paths relative to this script directory
+CURRENT_DIR = Path(__file__).resolve().parent
+MODEL_PATH = CURRENT_DIR / "model" / "model_data.pkl"
 
-@st_cache_resource_or_load()
+
 def load_model_data():
-    if not os.path.exists(MODEL_PATH):
-        raise FileNotFoundError(f"Model file not found at {MODEL_PATH}")
+    """Load serialized model artifacts from disk with caching if in Streamlit context."""
+    if not MODEL_PATH.exists():
+        raise FileNotFoundError(f"Model file not found at: {MODEL_PATH}")
     return joblib.load(MODEL_PATH)
 
-def st_cache_resource_or_load():
-    pass # Helper placeholder, real load below
 
-model_data = load_model_data() if os.path.exists(MODEL_PATH) else joblib.load(MODEL_PATH)
-model = model_data['model']
-scaler = model_data['scaler']
-features = model_data['features']
-columns_to_scale = model_data['cols_to_scale']
+# Load artifacts
+_model_data = load_model_data()
+model = _model_data['model']
+scaler = _model_data['scaler']
+features = _model_data['features']
+columns_to_scale = _model_data['cols_to_scale']
 
 
-def data_preparation(age, avg_dpd_per_dm, credit_utilization_ratio, dmtlm, income, 
-                     loan_amount, loan_tenure_months, total_loan_months, 
-                     loan_purpose, loan_type, residence_type):
+def data_preparation(
+    age: int,
+    avg_dpd_per_dm: float,
+    credit_utilization_ratio: float,
+    dmtlm: float,
+    income: float,
+    loan_amount: float,
+    loan_tenure_months: int,
+    total_loan_months: int,
+    loan_purpose: str,
+    loan_type: str,
+    residence_type: str,
+) -> pd.DataFrame:
+    """
+    Prepare and scale user input features for model inference.
+    """
+    lti = (loan_amount / income) if income > 0 else 0.0
+
     data_input = {
-        'age': age,
-        'avg_dpd_per_dm': avg_dpd_per_dm,
-        'credit_utilization_ratio': credit_utilization_ratio,
-        'dmtlm': dmtlm,
-        'income': income,
-        'loan_amount': loan_amount,
-        'lti': loan_amount / income if income > 0 else 0,
-        'total_loan_months': total_loan_months,
-        'loan_tenure_months': loan_tenure_months,
-        'loan_purpose_Education': 1 if loan_purpose == 'Education' else 0,
-        'loan_purpose_Home': 1 if loan_purpose == 'Home' else 0,
-        'loan_purpose_Personal': 1 if loan_purpose == 'Personal' else 0,
-        'loan_type_Unsecured': 1 if loan_type == 'Unsecured' else 0,
-        'residence_type_Owned': 1 if residence_type == 'Owned' else 0,
-        'residence_type_Rented': 1 if residence_type == 'Rented' else 0
+        'age': float(age),
+        'avg_dpd_per_dm': float(avg_dpd_per_dm),
+        'credit_utilization_ratio': float(credit_utilization_ratio),
+        'dmtlm': float(dmtlm),
+        'income': float(income),
+        'loan_amount': float(loan_amount),
+        'lti': float(lti),
+        'total_loan_months': float(total_loan_months),
+        'loan_tenure_months': float(loan_tenure_months),
+        'loan_purpose_Education': 1.0 if loan_purpose == 'Education' else 0.0,
+        'loan_purpose_Home': 1.0 if loan_purpose == 'Home' else 0.0,
+        'loan_purpose_Personal': 1.0 if loan_purpose == 'Personal' else 0.0,
+        'loan_type_Unsecured': 1.0 if loan_type == 'Unsecured' else 0.0,
+        'residence_type_Owned': 1.0 if residence_type == 'Owned' else 0.0,
+        'residence_type_Rented': 1.0 if residence_type == 'Rented' else 0.0,
     }
-    
+
     df = pd.DataFrame([data_input])
+    # Apply standard scaling to numerical features
     df[columns_to_scale] = scaler.transform(df[columns_to_scale])
+    # Select columns in exact order expected by trained model
     df = df[features]
-    
+
     return df
 
 
-def calculate_credit_score(input_df, base_score=300, scale_length=600):
-    default_probability = model.predict_proba(input_df)[:, 1][0]  # Probability of default
+def calculate_credit_score(input_df: pd.DataFrame, base_score: int = 300, scale_length: int = 600):
+    """
+    Compute default probability, credit score (300-900), and categorical rating.
+    """
+    proba = model.predict_proba(input_df)
+    default_probability = float(proba[0, 1])
     non_default_probability = 1.0 - default_probability
 
-    # Calculate the credit score based on probabilities
-    credit_score = int(base_score + non_default_probability * scale_length)
-    
-    def get_rating(score):
+    # Calculate credit score (300 - 900)
+    raw_score = base_score + (non_default_probability * scale_length)
+    credit_score = int(round(raw_score))
+    # Clamp score within valid bounds [300, 900]
+    credit_score = max(300, min(900, credit_score))
+
+    def get_rating(score: int):
         if 300 <= score < 500:
             return 'Poor', '🔴'
         elif 500 <= score < 650:
@@ -73,17 +101,32 @@ def calculate_credit_score(input_df, base_score=300, scale_length=600):
 
     rating, badge = get_rating(credit_score)
 
-    return float(default_probability), credit_score, rating, badge
+    return default_probability, credit_score, rating, badge
 
 
-def predict(age, avg_dpd_per_dm, credit_utilization_ratio, dmtlm, income, 
-            loan_amount, loan_tenure_months, total_loan_months, 
-            loan_purpose, loan_type, residence_type):
-
-    input_df = data_preparation(age, avg_dpd_per_dm, credit_utilization_ratio, dmtlm, income, 
-                                 loan_amount, loan_tenure_months, total_loan_months, 
-                                 loan_purpose, loan_type, residence_type)
+def predict(
+    age: int,
+    avg_dpd_per_dm: float,
+    credit_utilization_ratio: float,
+    dmtlm: float,
+    income: float,
+    loan_amount: float,
+    loan_tenure_months: int,
+    total_loan_months: int,
+    loan_purpose: str,
+    loan_type: str,
+    residence_type: str,
+):
+    """
+    End-to-end prediction pipeline from raw inputs to evaluated credit score.
+    """
+    input_df = data_preparation(
+        age, avg_dpd_per_dm, credit_utilization_ratio, dmtlm, income,
+        loan_amount, loan_tenure_months, total_loan_months,
+        loan_purpose, loan_type, residence_type
+    )
 
     probability, credit_score, rating, badge = calculate_credit_score(input_df)
 
     return probability, credit_score, rating, badge
+
