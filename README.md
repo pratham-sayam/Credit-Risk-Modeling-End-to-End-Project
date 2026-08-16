@@ -1,11 +1,13 @@
 # 📊 Credit Risk Modeling & Scoring System (End-to-End ML Pipeline)
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://streamlit.io/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://credit-risk-modeling-end-to-end-project-pratham.streamlit.app)
 [![Python 3.9+](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 [![XGBoost](https://img.shields.io/badge/XGBoost-ML-green.svg)](https://xgboost.readthedocs.io/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 An end-to-end Machine Learning solution for credit risk evaluation, default probability estimation, and credit rating score generation. Built with **XGBoost**, **Scikit-Learn**, and deployed using an interactive **Streamlit** dashboard.
+
+🔗 **Live Web Application:** [https://credit-risk-modeling-end-to-end-project-pratham.streamlit.app](https://credit-risk-modeling-end-to-end-project-pratham.streamlit.app)
 
 ---
 
@@ -71,13 +73,10 @@ streamlit run project-root/main.py
 
 ---
 
-## 🚀 Cloud Deployment (Streamlit Community Cloud)
+## 🚀 Live Cloud Deployment
 
-1. Fork or push this repository to GitHub.
-2. Sign in to [Streamlit Community Cloud](https://share.streamlit.io/).
-3. Click **"New app"** and select this GitHub repository.
-4. Set **Main file path** to: `project-root/main.py`
-5. Click **Deploy!**
+Access the deployed web app on Streamlit Community Cloud:  
+👉 **[https://credit-risk-modeling-end-to-end-project-pratham.streamlit.app](https://credit-risk-modeling-end-to-end-project-pratham.streamlit.app)**
 
 ---
 
